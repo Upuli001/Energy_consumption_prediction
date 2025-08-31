@@ -1,0 +1,258 @@
+---
+title: "Energy_consumption_prediction"
+author: "Upuli Karunarathna"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE, results='hide', echo=FALSE, comment=NA}
+energy<-read.csv("C:/Users/Ranjula/Desktop/Energy_consumption/train_energy_data.csv")
+energy
+attach(energy)
+```
+
+#### **About the data set** <br>
+
+Based on a variety of building characteristics and environmental conditions, this data set aims to predict energy use. The description of the factors that can be influenced for energy consumption is given below.<br>
+<br>
+Building.Type : Categorical feature representing the type of building.( It is a dummy variable holds commercial type as  base level) <br>
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+Residential_type <- c("Residential", "Industrial")
+Residential <- c(1,0)
+Industrial <- c(0,1)
+Commercial <- c(0,0)
+table<- data.frame(Residential_type=Residential_type, Residential = Residential,
+                   Industrial = Industrial, Commercial = Commercial)
+table_t <- as.data.frame(t(table[,-1]))  # Transpose only numeric columns
+colnames(table_t) <- table$Residential_type  # Rename columns using original types
+table_t
+```
+Square.Footage: Numeric feature representing the total square footage of the building.<br>
+Number.of.Occupants: Numeric feature indicating the number of people occupying the building.<br>
+Appliances.Used: Numeric feature representing the number of appliances used in the building. <br>
+Average.Temperature: Numeric feature representing the average temperature of the building or climate area (in Celsius).<br>
+Day.of.Week: Categorical feature representing whether the data point corresponds to a weekday or weekend.(Weekend = 1, Weekday = 0)<br>
+Energy.Consumption: Numeric target variable representing the energy consumption of the building in kWh (kilowatt-hours).<br>
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+library(tidyverse)
+library(stats)
+```
+
+#### **Checking the outliers**
+1. For square footage
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+ggplot(energy, aes(y=Square.Footage)) + geom_boxplot()
+boxplot.stats(Square.Footage)$out
+```
+
+2. For Number of Occupants
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+ggplot(energy, aes(y=Number.of.Occupants)) + geom_boxplot()
+boxplot.stats(Number.of.Occupants)$out
+```
+
+
+3. For Appliances Used
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+ggplot(energy, aes(y=Appliances.Used)) + geom_boxplot()
+boxplot.stats(Appliances.Used)$out
+```
+
+4. For Average Temperature
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+ggplot(energy, aes(y=Average.Temperature)) + geom_boxplot()
+boxplot.stats(Average.Temperature)$out
+```
+
+5. For Energy Consumption
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+ggplot(energy, aes(y=Energy.Consumption)) + geom_boxplot()
+boxplot.stats(Energy.Consumption)$out
+```
+
+All box blots and relevant counts indicate that there are no any outliers among these variables. <br>
+
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+#### **Assigning NA for missing values in categorical variables and convert them into factors**
+Building<-as.character(Building.Type)
+Building.Type[Building.Type == ""] <- NA
+Building<-as.factor(Building.Type)
+
+Day<-as.character(Day.of.Week)
+Day.of.Week[Day.of.Week == ""] <- NA
+Day<-as.factor(Day.of.Week)
+```
+
+#### **Summary of the original data set**
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+str(energy)
+summary(energy)
+```
+
+#### **Number of rows with null values**
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+# Count rows with at least one NA value
+num_rows_with_na <- sum(!complete.cases(energy))
+num_rows_with_na
+```
+
+There are no any missing values in this data set and it is a complete data set.
+
+#### **Running a regression model to predict energy consumption**
++ **Considering main effects only** <br>
+
+**Model specification with forward selection method** <br>
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+library(carData)
+library(olsrr)
+model <- lm(Energy.Consumption ~ Square.Footage + Number.of.Occupants + Average.Temperature +  Appliances.Used + Building.Type + Day.of.Week, data=energy)
+ols_step_forward_p(model)
+```
+According to the forward selection method, it has been decided the variables which are included in the regression model are Square.Footage, Building.TypeIndustrial, Building.TypeResidential, Number.of.Occupants, Appliances.Used, Average.Temperature and Day.of.WeekWeekend. 
+Then the estimated regreesion model is, 
+
+$$
+\hat{Energy\_Consumption} = 2050.001 + 0.050 \times Square\_Footage + 500 \times Building\_Type\_(Industrial) -500 \times TBuilding\_Type\_(Residential) + 10 \times Number\_of\_Occupants + 20 \times Appliances\_used - 5 \times Average\_Temperature - 50 \times Day\_of\_Week\_(Weekend)
+$$
+
++ **Considering interaction effects**<br>
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+model_int <- lm(Energy.Consumption ~ (Square.Footage + Number.of.Occupants + Average.Temperature +  Appliances.Used + Building.Type + Day.of.Week)^2, data=energy)
+summary(model_int)
+```
+Hypothesis to be tested: <br>
+H0: Coefficient of predictor variable (including intercept) are equal to zero.<br>
+H1: Coefficient of predictor variable (including intercept) are not equal to zero.<br>
+
+H0 is rejected is p value < 0.05 at 5% level of significance. Since all interaction effects are insignificant because p values are less than 0.05 (level of significance)
+Then we can come up with the model with main effects only. Hence, <br>
+<br>
+**The final model to predict energy consumption is,** <br>
+
+$$
+\hat{Energy\_Consumption} = 2050.001 + 0.050 \times Square\_Footage + 500 \times Building\_Type\_(Industrial) -500 \times TBuilding\_Type\_(Residential) + 10 \times Number\_of\_Occupants + 20 \times Appliances\_used - 5 \times Average\_Temperature - 50 \times Day\_of\_Week\_(Weekend)
+$$
+
+#### **Coefficients interpretation** <br>
+1. Square footage <br>
+On average, for each one additional square foot, energy consumption increases by 0.05 units, holding all other variables constant.<br>
+<br>
+2. Number of Occupants <br>
+On average, for each one additional occupant, energy consumption increases by 10 kWh, assuming all other variables remain constant. <br>
+<br>
+3. Average Temperature <br>
+On average, for each 1°C increase in temperature, energy consumption decreases by 5 kWh, assuming other factors are constant. <br>
+<br>
+4. Appliances Used <br>
+On average, for each one additional appliance, energy consumption increases by 20 kWh, holding other factors constant. <br>
+<br>
+5. Building Type(Industrial) <br>
+On average, industrial buildings consume energy 500 kWh more than commercial buildings (base level), holding all factors constant. <br>
+<br>
+6. Building Type(Residential) <br>
+On average, residential buildings consume energy 500 kWh less than commercial buildings (base level), holding all factors constant. <br>
+<br>
+7. Day of Week(Weekend) <br>
+On average, during weekends, energy consumption is 50 kWh lower than on weekdays, holding all other factors constant. <br>
+<br>
+
+#### **Model assumptions and accuracy** <br>
++ **Checking influential points**
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+cooksD <- cooks.distance(model)
+influential_points <- which(cooksD > 4/(nrow(energy)-length(model$coefficients)-1))
+energy[influential_points, ]
+```
+
+There are no influential points among data.
+
++ **Considering AIC value, Adjusted R² value, Residual standard error**
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+AIC(model)
+summary(model)$adj.r.squared
+summary(model)$sigma
+```
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+#+ **model residuals, fitted values, and other diagnostics**
+
+library(broom)
+model_fitresid <- augment(model)
+```
+
++ **Normality**
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+shapiro.test(model_fitresid$.resid)
+```
+
+Hypothesis to be tested: <br>
+H0: Residuals are normally distributed vs. H1: Residuals are not normally distributed <br>
+
+H0 is rejected if p value < 0.05 at 5% level of significance.Since p value is less than 2.2e-16 and it is also less than 0.05. So we have enough evidence to reject H0 at 5% level of significance. Hence residuals are not normally distributed.
+But it is not that much essential when conducting a model for prediction purpose. 
+
++ **Gauss Markov assumptions**
+
+1. Linearity <br>
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+plot(model_fitresid$.fitted, model_fitresid$.resid)
+abline(h = 0, col="red")
+
+```
+
+Data points are scattered around zero and there is no any specific pattern like funnel, curvature, double bow etc. But the data points are scattered like horizontal lines. It is happened because of residuals are discrete or quantized rather than continuous. It does not matter for linearity. Hence this plot shows model must be linear in parameters.<br>
+
+2. Independence <br>
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+plot(model$residuals, type = "p",
+     main = "Residuals vs Observation Index",
+     xlab = "Observation Index", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+ Since Residuals are scattered randomly around 0, without any specific trend or pattern.There is no obvious clustering or systematic sequence across the observation index. Hence it can be concluded that residuals are approximately independent.
+ 
+3. Homoscedasticity (Constant Variance)
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+library(lmtest)
+bptest(model)
+
+```
+
+Hypothesis to be tested: <br>
+H0: Residuals have constant variance vs. H1: Residuals have not constant variance <br>
+
+H0 is rejected if p value < 0.05 at 5% level of significance.Since p value = 0.2747 > 0.05, we do not have enough evidence to reject H0 at 5% level of significance. Hence homoscedasticity assumption is not violated.
+
+4. No Perfect Multicollinearity
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+library(car)
+vif(model)
+```
+
+Since the VIF values for the variables are close to 1 it can be concluded that there is no correlation among variables and then the there is no perfect multicollinearity.
+
+5. Zero conditional mean 
+```{r,echo=FALSE,warning=FALSE,message=FALSE,comment=NA}
+mean(model_fitresid$.resid)
+```
+
+Since the mean of residuals are very close to zero, it can be said that the residuals have zero conditional mean. 
+
+#### **Discussion** <br>
+1. Whole data set is separated into testing set and training set. Prediction model is created under training set and by using testing set, performance of the model is checked. <br>
+2. The data set is a completed one and there are no outliers as well as influential points. <br>
+3. Residuals are not normal but the main purpose of this model is not for inferences but for prediction. Then it is not that much influenced. <br>
+4. Gauss Markov assumptions are also checked. <br>
+5. The data may contain variability due to measurement error, unmeasured confounding variables, or differences in energy consumption factors.<br>
+6. In this analysis it is assumed that except the factors considered, all other factors which may have effects on the energy consumption remained as constants for all the cases considered.<br>
+
+#### **Conclusions** <br>
+1. Increment of square footage, number of occupants, appliances used may affect to increase the energy consumption.<br>
+2. Increments of average temperature may affect to reduce the energy consumption. <br>
+3.Residential type of Buildings can influenced to reduce energy consumption rather than industrial type of buildings compared to commercial type of buildings.
